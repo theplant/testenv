@@ -19,7 +19,7 @@ type TestModel struct {
 var db *gorm.DB
 
 func TestMain(m *testing.M) {
-	env, err := testenv.New().DBEnable(true).DBUser("sam").SetUp()
+	env, err := testenv.New().DBEnable(true).SetUp()
 	if err != nil {
 		panic(err)
 	}
