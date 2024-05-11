@@ -69,6 +69,7 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (*gorm.DB
 
 	sqlDB, err := db.DB()
 	if err != nil {
+		defer container.Terminate(ctx)
 		return nil, nil, fmt.Errorf("no underlying sqlDB: %w", err)
 	}
 
