@@ -32,7 +32,7 @@ func (b *TestEnvBuilder) DBName(v string) *TestEnvBuilder {
 	return b
 }
 
-func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (*gorm.DB, func() error, error) {
+func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (_ *gorm.DB, _ func() error, xerr error) {
 	container, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
@@ -51,6 +51,11 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (*gorm.DB
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to start container: %w", err)
 	}
+	defer func() {
+		if xerr != nil {
+			container.Terminate(context.Background())
+		}
+	}()
 
 	endpoint, err := container.Endpoint(ctx, "")
 	if err != nil {
@@ -63,13 +68,11 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (*gorm.DB
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		defer container.Terminate(ctx)
 		return nil, nil, err
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		defer container.Terminate(ctx)
 		return nil, nil, fmt.Errorf("no underlying sqlDB: %w", err)
 	}
 
