@@ -7,31 +7,19 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
 type TestEnvBuilder struct {
-	ctx                    context.Context
+	ctx context.Context
+
+	dbEnable               bool
 	dbUser, dbPass, dbName string
 }
 
 func New() *TestEnvBuilder {
 	return &TestEnvBuilder{}
-}
-
-func (b *TestEnvBuilder) DBUser(v string) *TestEnvBuilder {
-	b.dbUser = v
-	return b
-}
-
-func (b *TestEnvBuilder) DBPass(v string) *TestEnvBuilder {
-	b.dbPass = v
-	return b
-}
-
-func (b *TestEnvBuilder) DBName(v string) *TestEnvBuilder {
-	b.dbName = v
-	return b
 }
 
 func (b *TestEnvBuilder) Context(ctx context.Context) *TestEnvBuilder {
@@ -52,22 +40,32 @@ func (env *TestEnv) TearDown() error {
 	return env.tearDown()
 }
 
-func (b *TestEnvBuilder) SetUp() (env *TestEnv, xerr error) {
+func (b *TestEnvBuilder) SetUp() (*TestEnv, error) {
 	ctx := cmp.Or(b.ctx, context.Background())
-	dbUser := cmp.Or(b.dbUser, "test_user")
-	dbPass := cmp.Or(b.dbPass, "test_pass")
-	dbName := cmp.Or(b.dbName, "test_db")
 
-	db, dbCloser, err := setupDatabase(ctx, dbUser, dbPass, dbName)
-	if err != nil {
-		return nil, err
+	env := &TestEnv{}
+
+	closers := []func() error{}
+	if b.dbEnable {
+		dbUser := cmp.Or(b.dbUser, "test_user")
+		dbPass := cmp.Or(b.dbPass, "test_pass")
+		dbName := cmp.Or(b.dbName, "test_db")
+		db, dbCloser, err := setupDatabase(ctx, dbUser, dbPass, dbName)
+		if err != nil {
+			return nil, err
+		}
+		env.DB = db
+		closers = append(closers, dbCloser)
 	}
-	return &TestEnv{
-		DB: db,
-		tearDown: func() error {
-			return dbCloser()
-		},
-	}, nil
+
+	env.tearDown = func() error {
+		var errG errgroup.Group
+		for _, f := range closers {
+			errG.Go(f)
+		}
+		return errG.Wait()
+	}
+	return env, nil
 }
 
 func (b *TestEnvBuilder) SetUpWithT(t *testing.T) (*TestEnv, error) {

@@ -12,6 +12,26 @@ import (
 	"gorm.io/gorm"
 )
 
+func (b *TestEnvBuilder) DBEnable(v bool) *TestEnvBuilder {
+	b.dbEnable = v
+	return b
+}
+
+func (b *TestEnvBuilder) DBUser(v string) *TestEnvBuilder {
+	b.dbUser = v
+	return b
+}
+
+func (b *TestEnvBuilder) DBPass(v string) *TestEnvBuilder {
+	b.dbPass = v
+	return b
+}
+
+func (b *TestEnvBuilder) DBName(v string) *TestEnvBuilder {
+	b.dbName = v
+	return b
+}
+
 func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (*gorm.DB, func() error, error) {
 	container, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{

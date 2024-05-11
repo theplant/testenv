@@ -1,10 +1,13 @@
 # testenv
+Used to initialize the test environment, assisted by containers.
+
+## Usage
 
 ```go
 import (
 	"testing"
 
-	"github.com/qor5/admin/v3/internal/testenv"
+	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +19,7 @@ type TestModel struct {
 var db *gorm.DB
 
 func TestMain(m *testing.M) {
-	env, err := testenv.New().DBUser("sam").SetUp()
+	env, err := testenv.New().DBEnable(true).DBUser("sam").SetUp()
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +44,7 @@ func TestSelectVersion(t *testing.T) {
 
 func TestSetupTestEnv(t *testing.T) {
 	// If you don't want to initialize in TestMain
-	env, err := testenv.New().SetUpWithT(t)
+	env, err := testenv.New().DBEnable(true).SetUpWithT(t)
 	if err != nil {
 		t.Fatal(err)
 	}

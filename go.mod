@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/testcontainers/testcontainers-go v0.31.0
+	golang.org/x/sync v0.3.0
 	gorm.io/driver/postgres v1.5.7
 	gorm.io/gorm v1.25.10
 )
