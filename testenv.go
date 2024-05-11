@@ -47,10 +47,11 @@ func (b *TestEnvBuilder) SetUp() (*TestEnv, error) {
 
 	closers := []func() error{}
 	if b.dbEnable {
-		dbUser := cmp.Or(b.dbUser, "test_user")
-		dbPass := cmp.Or(b.dbPass, "test_pass")
-		dbName := cmp.Or(b.dbName, "test_db")
-		db, dbCloser, err := setupDatabase(ctx, dbUser, dbPass, dbName)
+		db, dbCloser, err := setupDatabase(ctx,
+			cmp.Or(b.dbUser, "test_user"),
+			cmp.Or(b.dbPass, "test_pass"),
+			cmp.Or(b.dbName, "test_db"),
+		)
 		if err != nil {
 			return nil, err
 		}
