@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -43,7 +42,7 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (_ *gorm.
 					"POSTGRES_PASSWORD": dbPass,
 					"POSTGRES_DB":       dbName,
 				},
-				WaitingFor: wait.ForLog("database system is ready to accept connections"),
+				WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 			},
 			Started: true,
 		},
@@ -62,9 +61,6 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (_ *gorm.
 		return nil, nil, fmt.Errorf("fail to get endpoint: %w", err)
 	}
 	dsn := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", dbUser, dbPass, endpoint, dbName)
-
-	// WARN: required, dont know why
-	time.Sleep(300 * time.Millisecond)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
