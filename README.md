@@ -56,4 +56,20 @@ func TestSetupTestEnv(t *testing.T) {
 }
 ```
 
+## Specify the database port
+
+1. Use environment variables:
+
+```shell
+export THEPLANT_TEST_ENV_DB_PORT="5432"
+```
+
+2. Coding:
+
+```go
+env, err := testenv.New().DBEnable(true).DBPort(5432).SetUp()
+```
+
+## Troubleshooting
+
 If you encounter this error: `Failed to get image auth for https://index.docker.io/v1/. Setting empty credentials for the image: postgres:16.3-alpine`, try `docker pull postgres:16.3-alpine` first.
