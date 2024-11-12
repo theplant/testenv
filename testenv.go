@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"os"
 	"sync/atomic"
 	"testing"
 
@@ -11,18 +12,22 @@ import (
 	"gorm.io/gorm"
 )
 
-type TestEnvBuilder struct {
+type Builder struct {
 	ctx context.Context
 
 	dbEnable               bool
 	dbUser, dbPass, dbName string
+	// dbPort is the dbPort that the database listens on.
+	// this is the parameter to be passed to the `docker run -p dbPort:5432` command.
+	// if not set or set to "0", a random dbPort will be assigned.
+	dbPort string
 }
 
-func New() *TestEnvBuilder {
-	return &TestEnvBuilder{}
+func New() *Builder {
+	return &Builder{}
 }
 
-func (b *TestEnvBuilder) Context(ctx context.Context) *TestEnvBuilder {
+func (b *Builder) Context(ctx context.Context) *Builder {
 	b.ctx = ctx
 	return b
 }
@@ -40,17 +45,22 @@ func (env *TestEnv) TearDown() error {
 	return env.tearDown()
 }
 
-func (b *TestEnvBuilder) SetUp() (*TestEnv, error) {
+const (
+	EnvDBPort = "THEPLANT_TEST_ENV_DB_PORT"
+)
+
+func (b *Builder) SetUp() (*TestEnv, error) {
 	ctx := cmp.Or(b.ctx, context.Background())
 
 	env := &TestEnv{}
 
-	closers := []func() error{}
+	var closers []func() error
 	if b.dbEnable {
 		db, dbCloser, err := setupDatabase(ctx,
 			cmp.Or(b.dbUser, "test_user"),
 			cmp.Or(b.dbPass, "test_pass"),
 			cmp.Or(b.dbName, "test_db"),
+			cmp.Or(b.dbPort, os.Getenv(EnvDBPort), "0"),
 		)
 		if err != nil {
 			return nil, err
@@ -69,7 +79,7 @@ func (b *TestEnvBuilder) SetUp() (*TestEnv, error) {
 	return env, nil
 }
 
-func (b *TestEnvBuilder) SetUpWithT(t *testing.T) (*TestEnv, error) {
+func (b *Builder) SetUpWithT(t *testing.T) (*TestEnv, error) {
 	env, err := b.SetUp()
 	if err != nil {
 		return nil, err
