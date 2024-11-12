@@ -5,33 +5,40 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func (b *TestEnvBuilder) DBEnable(v bool) *TestEnvBuilder {
+func (b *Builder) DBEnable(v bool) *Builder {
 	b.dbEnable = v
 	return b
 }
 
-func (b *TestEnvBuilder) DBUser(v string) *TestEnvBuilder {
+func (b *Builder) DBUser(v string) *Builder {
 	b.dbUser = v
 	return b
 }
 
-func (b *TestEnvBuilder) DBPass(v string) *TestEnvBuilder {
+func (b *Builder) DBPass(v string) *Builder {
 	b.dbPass = v
 	return b
 }
 
-func (b *TestEnvBuilder) DBName(v string) *TestEnvBuilder {
+func (b *Builder) DBName(v string) *Builder {
 	b.dbName = v
 	return b
 }
 
-func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (_ *gorm.DB, _ func() error, xerr error) {
+func (b *Builder) DBPort(v string) *Builder {
+	b.dbPort = v
+	return b
+}
+
+func setupDatabase(ctx context.Context, dbUser, dbPass, dbName, hostPort string) (_ *gorm.DB, _ func() error, xerr error) {
 	container, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
@@ -43,6 +50,16 @@ func setupDatabase(ctx context.Context, dbUser, dbPass, dbName string) (_ *gorm.
 					"POSTGRES_DB":       dbName,
 				},
 				WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+				HostConfigModifier: func(hostConfig *container.HostConfig) {
+					hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
+						"5432/tcp": {
+							{
+								HostIP:   "0.0.0.0",
+								HostPort: hostPort,
+							},
+						},
+					}
+				},
 			},
 			Started: true,
 		},
