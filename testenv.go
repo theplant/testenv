@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/go-redis/redis/v8"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
@@ -15,12 +16,11 @@ import (
 type Builder struct {
 	ctx context.Context
 
-	dbEnable               bool
-	dbUser, dbPass, dbName string
-	// dbPort is the dbPort that the database listens on.
-	// this is the parameter to be passed to the `docker run -p dbPort:5432` command.
-	// if not set or set to "0", a random dbPort will be assigned.
-	dbPort string
+	dbEnable                                bool
+	dbImage, dbUser, dbPass, dbName, dbPort string
+
+	redisEnable           bool
+	redisImage, redisPort string
 }
 
 func New() *Builder {
@@ -34,6 +34,7 @@ func (b *Builder) Context(ctx context.Context) *Builder {
 
 type TestEnv struct {
 	DB       *gorm.DB
+	Redis    *redis.Client
 	tearDown func() error
 	tornDown atomic.Bool
 }
@@ -46,7 +47,8 @@ func (env *TestEnv) TearDown() error {
 }
 
 const (
-	EnvDBPort = "THEPLANT_TEST_ENV_DB_PORT"
+	EnvDBPort    = "THEPLANT_TEST_ENV_DB_PORT"
+	EnvRedisPort = "THEPLANT_TEST_ENV_REDIS_PORT"
 )
 
 func (b *Builder) SetUp() (*TestEnv, error) {
@@ -56,17 +58,30 @@ func (b *Builder) SetUp() (*TestEnv, error) {
 
 	var closers []func() error
 	if b.dbEnable {
-		db, dbCloser, err := setupDatabase(ctx,
+		db, dbCloser, err := SetupDatabase(ctx,
+			cmp.Or(b.dbImage, "postgres:16.3-alpine"),
 			cmp.Or(b.dbUser, "test_user"),
 			cmp.Or(b.dbPass, "test_pass"),
 			cmp.Or(b.dbName, "test_db"),
-			cmp.Or(b.dbPort, os.Getenv(EnvDBPort), "0"),
+			cmp.Or(b.dbPort, os.Getenv(EnvDBPort), ""),
 		)
 		if err != nil {
 			return nil, err
 		}
 		env.DB = db
 		closers = append(closers, dbCloser)
+	}
+
+	if b.redisEnable {
+		redis, redisCloser, err := SetupRedis(ctx,
+			cmp.Or(b.redisImage, ""),
+			cmp.Or(b.redisPort, os.Getenv(EnvRedisPort), ""),
+		)
+		if err != nil {
+			return nil, err
+		}
+		env.Redis = redis
+		closers = append(closers, redisCloser)
 	}
 
 	env.tearDown = func() error {
