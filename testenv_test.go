@@ -1,8 +1,11 @@
 package testenv_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 )
@@ -39,14 +42,28 @@ func TestSelectVersion(t *testing.T) {
 }
 
 func TestSetupTestEnv(t *testing.T) {
+	ctx := context.Background()
+
 	// If you don't want to initialize in TestMain
-	env, err := testenv.New().DBEnable(true).SetUpWithT(t)
+	env, err := testenv.New().DBEnable(true).RedisEnable(true).SetUpWithT(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var version string
-	if err := env.DB.Raw("SELECT version()").Scan(&version).Error; err != nil {
+	if err := env.DB.WithContext(ctx).Raw("SELECT version()").Scan(&version).Error; err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("current database version: %q", version)
+	assert.Contains(t, version, "PostgreSQL 16.3")
+
+	{
+		cmd := env.Redis.Set(ctx, "test", "test", 0)
+		require.NoError(t, cmd.Err())
+	}
+
+	{
+		cmd := env.Redis.Get(ctx, "test")
+		require.NoError(t, cmd.Err())
+		assert.Equal(t, "test", cmd.Val())
+	}
 }

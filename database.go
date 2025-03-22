@@ -18,6 +18,11 @@ func (b *Builder) DBEnable(v bool) *Builder {
 	return b
 }
 
+func (b *Builder) DBImage(v string) *Builder {
+	b.dbImage = v
+	return b
+}
+
 func (b *Builder) DBUser(v string) *Builder {
 	b.dbUser = v
 	return b
@@ -38,30 +43,38 @@ func (b *Builder) DBPort(v string) *Builder {
 	return b
 }
 
-func setupDatabase(ctx context.Context, dbUser, dbPass, dbName, hostPort string) (_ *gorm.DB, _ func() error, xerr error) {
+func SetupDatabase(ctx context.Context, image, dbUser, dbPass, dbName, hostPort string) (_ *gorm.DB, _ func() error, xerr error) {
+	image = cmp.Or(image, "postgres:17.4-alpine3.21")
+	dbUser = cmp.Or(dbUser, "postgres")
+	dbPass = cmp.Or(dbPass, "postgres")
+	dbName = cmp.Or(dbName, "postgres")
+	req := testcontainers.ContainerRequest{
+		Image:        image,
+		ExposedPorts: []string{"5432/tcp"},
+		Env: map[string]string{
+			"POSTGRES_USER":     dbUser,
+			"POSTGRES_PASSWORD": dbPass,
+			"POSTGRES_DB":       dbName,
+		},
+		Cmd:        []string{"postgres", "-c", "fsync=off"},
+		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+	}
+	if hostPort != "" {
+		req.HostConfigModifier = func(hostConfig *container.HostConfig) {
+			hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
+				"5432/tcp": {
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: hostPort,
+					},
+				},
+			}
+		}
+	}
 	container, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "postgres:16.3-alpine",
-				ExposedPorts: []string{"5432/tcp"},
-				Env: map[string]string{
-					"POSTGRES_USER":     dbUser,
-					"POSTGRES_PASSWORD": dbPass,
-					"POSTGRES_DB":       dbName,
-				},
-				WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
-				HostConfigModifier: func(hostConfig *container.HostConfig) {
-					hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
-						"5432/tcp": {
-							{
-								HostIP:   "0.0.0.0",
-								HostPort: hostPort,
-							},
-						},
-					}
-				},
-			},
-			Started: true,
+			ContainerRequest: req,
+			Started:          true,
 		},
 	)
 	if err != nil {
