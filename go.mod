@@ -1,7 +1,6 @@
 module github.com/theplant/testenv
 
-go 1.22
-toolchain go1.24.1
+go 1.23.0
 
 require (
 	github.com/docker/docker v27.1.1+incompatible
