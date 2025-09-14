@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -43,11 +44,26 @@ func (b *Builder) DBPort(v string) *Builder {
 	return b
 }
 
-func SetupDatabase(ctx context.Context, image, dbUser, dbPass, dbName, hostPort string) (_ *gorm.DB, _ func() error, xerr error) {
-	image = cmp.Or(image, "postgres:17.4-alpine3.21")
-	dbUser = cmp.Or(dbUser, "postgres")
-	dbPass = cmp.Or(dbPass, "postgres")
-	dbName = cmp.Or(dbName, "postgres")
+type SetupDatabaseInput struct {
+	Image        string
+	User         string
+	Pass         string
+	DatabaseName string
+	HostPort     string
+}
+
+type SetupDatabaseOutput struct {
+	DB     *gorm.DB
+	DSN    string
+	Closer func() error
+}
+
+func SetupDatabase(ctx context.Context, input *SetupDatabaseInput) (_ *SetupDatabaseOutput, xerr error) {
+	image := cmp.Or(input.Image, "postgres:17.4-alpine3.21")
+	dbUser := cmp.Or(input.User, "postgres")
+	dbPass := cmp.Or(input.Pass, "postgres")
+	dbName := cmp.Or(input.DatabaseName, "postgres")
+	hostPort := cmp.Or(input.HostPort, "")
 	req := testcontainers.ContainerRequest{
 		Image:        image,
 		ExposedPorts: []string{"5432/tcp"},
@@ -71,41 +87,45 @@ func SetupDatabase(ctx context.Context, image, dbUser, dbPass, dbName, hostPort 
 			}
 		}
 	}
-	container, err := testcontainers.GenericContainer(ctx,
+	_container, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: req,
 			Started:          true,
 		},
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to start container: %w", err)
+		return nil, errors.Wrap(err, "fail to start container")
 	}
 	defer func() {
 		if xerr != nil {
-			container.Terminate(context.Background())
+			_ = _container.Terminate(context.Background())
 		}
 	}()
 
-	endpoint, err := container.Endpoint(ctx, "")
+	endpoint, err := _container.Endpoint(ctx, "")
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to get endpoint: %w", err)
+		return nil, errors.Wrap(err, "fail to get endpoint")
 	}
 	dsn := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", dbUser, dbPass, endpoint, dbName)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, nil, fmt.Errorf("no underlying sqlDB: %w", err)
+		return nil, errors.Wrap(err, "no underlying sqlDB")
 	}
 
-	return db, func() error {
-		return cmp.Or(
-			sqlDB.Close(),
-			container.Terminate(context.Background()),
-		)
+	return &SetupDatabaseOutput{
+		DB:  db,
+		DSN: dsn,
+		Closer: func() error {
+			return cmp.Or(
+				sqlDB.Close(),
+				_container.Terminate(context.Background()),
+			)
+		},
 	}, nil
 }

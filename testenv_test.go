@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	}
 	defer env.TearDown()
 
-	db = env.DB
+	db = env.DBEnv.DB
 	if err = db.AutoMigrate(&TestModel{}); err != nil {
 		panic(err)
 	}
@@ -59,11 +59,11 @@ func TestSetupTestEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	var version string
-	if err := env.DB.WithContext(ctx).Raw("SELECT version()").Scan(&version).Error; err != nil {
+	if err := env.DBEnv.DB.WithContext(ctx).Raw("SELECT version()").Scan(&version).Error; err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("current database version: %q", version)
-	assert.Contains(t, version, "PostgreSQL 16.3")
+	assert.Contains(t, version, "PostgreSQL 17.4")
 
 	{
 		cmd := env.Redis.Set(ctx, "test", "test", 0)

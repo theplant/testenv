@@ -32,8 +32,13 @@ func (b *Builder) Context(ctx context.Context) *Builder {
 	return b
 }
 
+type DBEnv struct {
+	DB  *gorm.DB
+	DSN string
+}
+
 type TestEnv struct {
-	DB       *gorm.DB
+	DBEnv    *DBEnv
 	Redis    *redis.Client
 	tearDown func() error
 	tornDown atomic.Bool
@@ -58,18 +63,21 @@ func (b *Builder) SetUp() (*TestEnv, error) {
 
 	var closers []func() error
 	if b.dbEnable {
-		db, dbCloser, err := SetupDatabase(ctx,
-			cmp.Or(b.dbImage, "postgres:16.3-alpine"),
-			cmp.Or(b.dbUser, "test_user"),
-			cmp.Or(b.dbPass, "test_pass"),
-			cmp.Or(b.dbName, "test_db"),
-			cmp.Or(b.dbPort, os.Getenv(EnvDBPort), ""),
-		)
+		output, err := SetupDatabase(ctx, &SetupDatabaseInput{
+			Image:        b.dbImage,
+			User:         cmp.Or(b.dbUser, "test_user"),
+			Pass:         cmp.Or(b.dbPass, "test_pass"),
+			DatabaseName: cmp.Or(b.dbName, "test_db"),
+			HostPort:     cmp.Or(b.dbPort, os.Getenv(EnvDBPort), ""),
+		})
 		if err != nil {
 			return nil, err
 		}
-		env.DB = db
-		closers = append(closers, dbCloser)
+		env.DBEnv = &DBEnv{
+			DB:  output.DB,
+			DSN: output.DSN,
+		}
+		closers = append(closers, output.Closer)
 	}
 
 	if b.redisEnable {
