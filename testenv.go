@@ -38,7 +38,7 @@ type DBEnv struct {
 }
 
 type TestEnv struct {
-	DB       *DBEnv
+	DBEnv    *DBEnv
 	Redis    *redis.Client
 	tearDown func() error
 	tornDown atomic.Bool
@@ -73,7 +73,7 @@ func (b *Builder) SetUp() (*TestEnv, error) {
 		if err != nil {
 			return nil, err
 		}
-		env.DB = &DBEnv{
+		env.DBEnv = &DBEnv{
 			DB:  output.DB,
 			DSN: output.DSN,
 		}
