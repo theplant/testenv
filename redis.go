@@ -4,10 +4,11 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/netip"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	testredis "github.com/testcontainers/testcontainers-go/modules/redis"
@@ -19,10 +20,10 @@ func SetupRedis(ctx context.Context, image, hostPort string) (_ *redis.Client, _
 	var opts []testcontainers.ContainerCustomizer
 	if hostPort != "" {
 		opts = append(opts, testcontainers.WithHostConfigModifier(func(hostConfig *container.HostConfig) {
-			hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
-				"6379/tcp": {
+			hostConfig.PortBindings = network.PortMap{
+				network.MustParsePort("6379/tcp"): {
 					{
-						HostIP:   "0.0.0.0",
+						HostIP:   netip.IPv4Unspecified(),
 						HostPort: hostPort,
 					},
 				},

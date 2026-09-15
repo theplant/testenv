@@ -4,9 +4,10 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/netip"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/postgres"
@@ -61,10 +62,10 @@ func SetupDatabase(ctx context.Context, image, dbUser, dbPass, dbName, hostPort 
 	}
 	if hostPort != "" {
 		req.HostConfigModifier = func(hostConfig *container.HostConfig) {
-			hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
-				"5432/tcp": {
+			hostConfig.PortBindings = network.PortMap{
+				network.MustParsePort("5432/tcp"): {
 					{
-						HostIP:   "0.0.0.0",
+						HostIP:   netip.IPv4Unspecified(),
 						HostPort: hostPort,
 					},
 				},
